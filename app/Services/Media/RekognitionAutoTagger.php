@@ -17,11 +17,13 @@ use Aws\Rekognition\RekognitionClient;
  */
 class RekognitionAutoTagger
 {
-    private RekognitionClient $client;
+    private ?RekognitionClient $client = null;
 
-    public function __construct(private readonly S3MediaStore $store)
+    public function __construct(private readonly S3MediaStore $store) {}
+
+    private function client(): RekognitionClient
     {
-        $this->client = new RekognitionClient([
+        return $this->client ??= new RekognitionClient([
             'version' => 'latest',
             'region' => config('services.aws.region'),
             'credentials' => [
@@ -64,7 +66,7 @@ class RekognitionAutoTagger
     private function detectLabelTags(MediaItem $mediaItem): array
     {
         try {
-            $response = $this->client->detectLabels([
+            $response = $this->client()->detectLabels([
                 'Image' => [
                     'S3Object' => [
                         'Bucket' => $this->store->bucket(),
@@ -110,7 +112,7 @@ class RekognitionAutoTagger
         $collectionId = (string) config('services.aws.rekognition.face_collection_id');
 
         try {
-            $response = $this->client->searchFacesByImage([
+            $response = $this->client()->searchFacesByImage([
                 'CollectionId' => $collectionId,
                 'Image' => [
                     'S3Object' => [
@@ -163,7 +165,7 @@ class RekognitionAutoTagger
         $collectionId = (string) config('services.aws.rekognition.face_collection_id');
 
         try {
-            $this->client->indexFaces([
+            $this->client()->indexFaces([
                 'CollectionId' => $collectionId,
                 'ExternalImageId' => $person->rekognitionExternalId(),
                 'Image' => [
@@ -190,10 +192,10 @@ class RekognitionAutoTagger
         $collectionId = (string) config('services.aws.rekognition.face_collection_id');
 
         try {
-            $this->client->describeCollection(['CollectionId' => $collectionId]);
+            $this->client()->describeCollection(['CollectionId' => $collectionId]);
         } catch (\Throwable) {
             try {
-                $this->client->createCollection(['CollectionId' => $collectionId]);
+                $this->client()->createCollection(['CollectionId' => $collectionId]);
             } catch (\Throwable $e) {
                 report($e);
             }

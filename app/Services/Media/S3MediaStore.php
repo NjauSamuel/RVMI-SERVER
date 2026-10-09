@@ -13,11 +13,11 @@ use Illuminate\Support\Str;
  */
 class S3MediaStore
 {
-    private S3Client $client;
+    private ?S3Client $client = null;
 
-    public function __construct()
+    private function client(): S3Client
     {
-        $this->client = new S3Client([
+        return $this->client ??= new S3Client([
             'version' => 'latest',
             'region' => config('services.aws.region'),
             'credentials' => [
@@ -52,13 +52,13 @@ class S3MediaStore
      */
     public function presignedPutUrl(string $key, string $contentType, int $expiresInSeconds = 900): string
     {
-        $command = $this->client->getCommand('PutObject', [
+        $command = $this->client()->getCommand('PutObject', [
             'Bucket' => $this->bucket(),
             'Key' => $key,
             'ContentType' => $contentType,
         ]);
 
-        $request = $this->client->createPresignedRequest($command, "+{$expiresInSeconds} seconds");
+        $request = $this->client()->createPresignedRequest($command, "+{$expiresInSeconds} seconds");
 
         return (string) $request->getUri();
     }
@@ -70,7 +70,7 @@ class S3MediaStore
      */
     public function getObjectBody(string $key): string
     {
-        $result = $this->client->getObject([
+        $result = $this->client()->getObject([
             'Bucket' => $this->bucket(),
             'Key' => $key,
         ]);
@@ -80,7 +80,7 @@ class S3MediaStore
 
     public function putObject(string $key, string $body, string $contentType): void
     {
-        $this->client->putObject([
+        $this->client()->putObject([
             'Bucket' => $this->bucket(),
             'Key' => $key,
             'Body' => $body,
@@ -91,7 +91,7 @@ class S3MediaStore
     public function headObject(string $key): ?array
     {
         try {
-            $result = $this->client->headObject([
+            $result = $this->client()->headObject([
                 'Bucket' => $this->bucket(),
                 'Key' => $key,
             ]);
@@ -104,7 +104,7 @@ class S3MediaStore
 
     public function copyObject(string $fromKey, string $toKey): void
     {
-        $this->client->copyObject([
+        $this->client()->copyObject([
             'Bucket' => $this->bucket(),
             'CopySource' => rawurlencode($this->bucket().'/'.$fromKey),
             'Key' => $toKey,
@@ -113,7 +113,7 @@ class S3MediaStore
 
     public function deleteObject(string $key): void
     {
-        $this->client->deleteObject([
+        $this->client()->deleteObject([
             'Bucket' => $this->bucket(),
             'Key' => $key,
         ]);
