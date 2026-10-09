@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class InventoryAsset extends Model
 {
@@ -12,8 +13,6 @@ class InventoryAsset extends Model
         'category_id',
         'description',
         'asset_image_key',
-        'receipt_file_key',
-        'receipt_mime',
         'purchase_date',
         'warranty_expiry',
         'status',
@@ -31,6 +30,11 @@ class InventoryAsset extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(InventoryCategory::class, 'category_id');
+    }
+
+    public function receipts(): HasMany
+    {
+        return $this->hasMany(InventoryReceipt::class)->orderBy('position')->orderBy('id');
     }
 
     public function creator(): BelongsTo
