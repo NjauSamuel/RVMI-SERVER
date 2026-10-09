@@ -4,13 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\MediaItem;
+use App\Services\Media\PendingMediaProcessor;
 use App\Services\Media\S3MediaStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class UploadController extends Controller
 {
-    public function __construct(private readonly S3MediaStore $store) {}
+    public function __construct(
+        private readonly S3MediaStore $store,
+        private readonly PendingMediaProcessor $processor,
+    ) {}
 
     /**
      * Step 1: client asks for presigned PUT URLs for a batch of files.
@@ -52,11 +56,11 @@ class UploadController extends Controller
     }
 
     /**
-     * Step 2: client confirms the PUT succeeded for a given item. Flips it to
-     * pending_processing so the media:process-pending cron tick picks it up
-     * (images get thumbnail + BlurHash + Rekognition; videos need a
-     * client-supplied poster-frame thumbnail passed here, since the server
-     * has no ffmpeg on shared hosting).
+     * Step 2: client confirms the PUT succeeded for a given item. Videos with
+     * a poster frame go straight to pending_review. Images are marked
+     * pending_processing and processed after this response is sent (thumbnail,
+     * BlurHash, Rekognition) so the phone does not wait on AWS. The 5-minute
+     * cron only retries rows whose processing did not finish.
      */
     public function complete(Request $request, MediaItem $mediaItem): JsonResponse
     {
@@ -90,6 +94,19 @@ class UploadController extends Controller
                 ? MediaItem::STATUS_PENDING_REVIEW
                 : MediaItem::STATUS_PENDING_PROCESSING,
         ])->save();
+
+        if ($mediaItem->status === MediaItem::STATUS_PENDING_PROCESSING) {
+            $processor = $this->processor;
+            $itemId = $mediaItem->id;
+
+            app()->terminating(function () use ($processor, $itemId) {
+                $item = MediaItem::query()->find($itemId);
+
+                if ($item !== null) {
+                    $processor->process($item);
+                }
+            });
+        }
 
         return response()->json(['data' => ['id' => $mediaItem->id, 'status' => $mediaItem->status]]);
     }

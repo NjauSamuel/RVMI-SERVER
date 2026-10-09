@@ -4,7 +4,7 @@ API for the Flutter app. Production URL: `https://rvmi.deskcheque.top`.
 
 One-time service setup (S3, Google Sign-In, Rekognition, FCM, Namecheap cron): the markdown files in [RVMI-MEDIA](../).
 
-This host has **cron only** — no queue workers, no websockets. Background work is `php artisan schedule:run`.
+This host has **cron only** — no queue workers, no websockets. Image auto-tagging runs at the end of `complete()`. The 5-minute `php artisan schedule:run` retries leftovers and sends the comment digest.
 
 ## Run (local)
 
@@ -22,10 +22,10 @@ Seeded account: Developer, Google sign-in only (no password). There is no public
 
 ## Production cron
 
-Namecheap cPanel → Cron Jobs, once per minute:
+Namecheap cPanel → Cron Jobs, once every five minutes (the host minimum; one entry only):
 
 ```txt
-* * * * * php /home/USERNAME/path/to/server/artisan schedule:run >> /dev/null 2>&1
+*/5 * * * * php /home/USERNAME/path/to/server/artisan schedule:run >> /dev/null 2>&1
 ```
 
-That tick runs `media:process-pending` (every minute) and `notifications:dispatch-digest` (every five minutes). Do not add a queue worker.
+That tick runs `notifications:dispatch-digest` and then `media:process-pending` (retry only, batch of 8). Do not add a queue worker.

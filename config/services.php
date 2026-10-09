@@ -72,8 +72,9 @@ return [
     ],
 
     'media_pipeline' => [
-        // How many "pending_processing" images the cron tick handles per run -
-        // kept small because shared hosting cron has a short execution budget.
+        // How many leftover pending_processing rows the 5-minute sweeper
+        // retries per tick. Normal uploads are processed on complete().
+        // Kept small because shared hosting cron has a short execution budget.
         'process_batch_size' => env('MEDIA_PROCESS_BATCH_SIZE', 8),
     ],
 
