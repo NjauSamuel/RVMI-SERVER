@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Support\Permissions;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 
@@ -16,10 +18,21 @@ class RoleController extends Controller
     {
         $roles = Role::query()
             ->with('permissions:id,name')
-            ->withCount('users')
             ->orderBy('name')
-            ->get()
-            ->map(fn (Role $role) => $this->toArray($role));
+            ->get();
+
+        $roleKey = config('permission.column_names.role_pivot_key') ?: 'role_id';
+        $counts = DB::table(config('permission.table_names.model_has_roles'))
+            ->where('model_type', User::class)
+            ->select($roleKey, DB::raw('count(*) as aggregate'))
+            ->groupBy($roleKey)
+            ->pluck('aggregate', $roleKey);
+
+        $roles = $roles->map(function (Role $role) use ($counts) {
+            $role->users_count = (int) ($counts[$role->id] ?? 0);
+
+            return $this->toArray($role);
+        });
 
         return response()->json([
             'data' => $roles,
