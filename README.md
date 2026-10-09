@@ -18,7 +18,7 @@ php artisan serve
 
 Serves `http://127.0.0.1:8000`. The Android emulator reaches that as `http://10.0.2.2:8000`. Health check: `GET /up`.
 
-Seeded login (Senior Bishop): `admin@rvmi.church` / `password`. There is no public signup — add members from the app (Users screen).
+Seeded account: Developer, Google sign-in only (no password). There is no public signup — add members from the app (Users screen).
 
 ## Production cron
 

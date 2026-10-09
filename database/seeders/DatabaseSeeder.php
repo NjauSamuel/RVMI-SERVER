@@ -14,17 +14,18 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RolePermissionSeeder::class);
 
-        // The User model hashes `password` itself. Passing Hash::make() here
-        // stores a hash of a hash, so "password" never matches.
+        // Password stays empty. The column is nullable, and password login
+        // already rejects an account with no password. This account signs in
+        // with Google only, so no secret is stored in the repo.
         $admin = User::query()->updateOrCreate(
-            ['email' => 'admin@rvmi.church'],
+            ['email' => 'njaus602@gmail.com'],
             [
-                'name' => 'RVMI Admin',
-                'password' => 'password',
+                'name' => 'Samuel Njau',
+                'password' => null,
                 'is_active' => true,
             ],
         );
-        $admin->assignRole('Senior Bishop');
+        $admin->syncRoles(['Developer']);
     }
 }
 

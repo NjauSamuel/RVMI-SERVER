@@ -40,7 +40,11 @@ class CommentController extends Controller
             'data' => [
                 'id' => $comment->id,
                 'body' => $comment->body,
-                'user' => ['id' => $request->user()->id, 'name' => $request->user()->name],
+                'user' => [
+                    'id' => $request->user()->id,
+                    'name' => $request->user()->name,
+                    'avatar_url' => $request->user()->avatar_url,
+                ],
                 'created_at' => $comment->created_at,
             ],
         ], 201);

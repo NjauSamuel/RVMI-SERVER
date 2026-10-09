@@ -90,6 +90,7 @@ class UserController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'avatar_url' => $user->avatar_url,
             'is_active' => $user->is_active,
             'roles' => $user->roles->pluck('name'),
             'created_at' => $user->created_at,
