@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\MediaItem;
 use App\Models\Tag;
 use App\Models\UserTagView;
@@ -72,6 +73,21 @@ class GalleryController extends Controller
         }
 
         return response()->json(['message' => 'ok']);
+    }
+
+    public function destroy(Request $request, MediaItem $mediaItem): JsonResponse
+    {
+        $kind = $mediaItem->type === 'video' ? 'video' : 'photo';
+        $mediaItem->delete();
+
+        AuditLog::record(
+            $request->user(),
+            'media.deleted',
+            $mediaItem,
+            "Deleted {$kind} #{$mediaItem->id}.",
+        );
+
+        return response()->json(['message' => 'Deleted.']);
     }
 
     /** @return array<string, mixed> */

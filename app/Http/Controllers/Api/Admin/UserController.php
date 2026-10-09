@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -63,8 +64,11 @@ class UserController extends Controller
             $user->update(['name' => $data['name']]);
         }
 
-        if (isset($data['is_active'])) {
+        if (array_key_exists('is_active', $data)) {
             $user->update(['is_active' => $data['is_active']]);
+            if (! $user->is_active) {
+                $user->tokens()->delete();
+            }
         }
 
         if (isset($data['role'])) {
@@ -74,13 +78,25 @@ class UserController extends Controller
         return response()->json(['data' => $this->toArray($user->fresh('roles'))]);
     }
 
-    public function destroy(User $user): JsonResponse
+    public function destroy(Request $request, User $user): JsonResponse
     {
-        // Soft "remove" by deactivating - keeps their uploads/comments intact.
-        $user->update(['is_active' => false]);
-        $user->tokens()->delete();
+        if ($request->user()->is($user)) {
+            abort(403, 'You cannot delete the account you are signed in as.');
+        }
 
-        return response()->json(['message' => 'User deactivated.']);
+        $name = $user->name;
+        $email = $user->email;
+        $user->tokens()->delete();
+        $user->delete();
+
+        AuditLog::record(
+            $request->user(),
+            'user.deleted',
+            $user,
+            "Deleted {$name} ({$email}).",
+        );
+
+        return response()->json(['message' => 'User deleted.']);
     }
 
     /** @return array<string, mixed> */

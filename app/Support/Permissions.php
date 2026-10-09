@@ -24,6 +24,8 @@ final class Permissions
 
     public const MANAGE_USERS = 'manage-users';
 
+    public const DELETE_RECORDS = 'delete-records';
+
     public const MANAGE_ROLES = 'manage-roles';
 
     public const MANAGE_SETTINGS = 'manage-settings';
@@ -40,6 +42,7 @@ final class Permissions
             self::COMMENT,
             self::MANAGE_INVENTORY,
             self::MANAGE_USERS,
+            self::DELETE_RECORDS,
             self::MANAGE_ROLES,
             self::MANAGE_SETTINGS,
         ];

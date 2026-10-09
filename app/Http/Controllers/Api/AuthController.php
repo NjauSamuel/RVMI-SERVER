@@ -50,8 +50,10 @@ class AuthController extends Controller
         $google = $this->googleIdTokens->verify($payload['id_token']);
 
         $user = User::query()
-            ->where('google_id', $google->id)
-            ->orWhere('email', $google->email)
+            ->where(function ($query) use ($google) {
+                $query->where('google_id', $google->id)
+                    ->orWhere('email', $google->email);
+            })
             ->first();
 
         if (! $user) {

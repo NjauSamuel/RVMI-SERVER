@@ -28,6 +28,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/gallery', [GalleryController::class, 'index']);
     Route::get('/gallery/{mediaItem}', [GalleryController::class, 'show']);
     Route::post('/gallery/{mediaItem}/view', [GalleryController::class, 'recordView']);
+    Route::delete('/gallery/{mediaItem}', [GalleryController::class, 'destroy'])->middleware('permission:delete-records');
 
     // Events + the umbrella comment thread.
     Route::get('/events', [EventController::class, 'index']);
@@ -90,7 +91,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/admin/users', [UserController::class, 'index']);
         Route::post('/admin/users', [UserController::class, 'store']);
         Route::patch('/admin/users/{user}', [UserController::class, 'update']);
-        Route::delete('/admin/users/{user}', [UserController::class, 'destroy']);
+        Route::delete('/admin/users/{user}', [UserController::class, 'destroy'])->middleware('permission:delete-records');
     });
 
     Route::middleware('permission:manage-roles')->group(function () {
