@@ -15,7 +15,7 @@ return new class extends Migration
             $table->date('event_date')->nullable();
             $table->foreignId('cover_media_item_id')->nullable();
             $table->enum('visibility', ['public', 'private'])->default('public');
-            $table->foreignId('created_by')->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
             $table->index(['visibility', 'event_date']);
