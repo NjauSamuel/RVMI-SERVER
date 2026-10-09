@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -15,13 +14,17 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RolePermissionSeeder::class);
 
-        if (! User::query()->where('email', 'admin@rvmi.church')->exists()) {
-            $admin = User::factory()->create([
+        // The User model hashes `password` itself. Passing Hash::make() here
+        // stores a hash of a hash, so "password" never matches.
+        $admin = User::query()->updateOrCreate(
+            ['email' => 'admin@rvmi.church'],
+            [
                 'name' => 'RVMI Admin',
-                'email' => 'admin@rvmi.church',
-                'password' => Hash::make('password'),
-            ]);
-            $admin->assignRole('Senior Bishop');
-        }
+                'password' => 'password',
+                'is_active' => true,
+            ],
+        );
+        $admin->assignRole('Senior Bishop');
     }
 }
+
