@@ -64,6 +64,22 @@ class S3MediaStore
     }
 
     /**
+     * A short-lived URL the phone can GET. Used when CloudFront is not
+     * configured, so the bucket can stay private.
+     */
+    public function presignedGetUrl(string $key, int $expiresInSeconds = 600): string
+    {
+        $command = $this->client()->getCommand('GetObject', [
+            'Bucket' => $this->bucket(),
+            'Key' => $key,
+        ]);
+
+        $request = $this->client()->createPresignedRequest($command, "+{$expiresInSeconds} seconds");
+
+        return (string) $request->getUri();
+    }
+
+    /**
      * Fetch the raw bytes of an object (used only for thumbnail generation,
      * where we must touch the pixels - kept to the smallest objects
      * possible, never full-resolution video).
