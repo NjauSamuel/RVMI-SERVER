@@ -44,10 +44,7 @@ class PendingMediaProcessor
             $attempts = $item->processing_attempts + 1;
 
             if ($attempts > self::MAX_ATTEMPTS) {
-                $item->update([
-                    'processing_attempts' => $attempts,
-                    'status' => MediaItem::STATUS_PENDING_REVIEW,
-                ]);
+                $this->markPendingReview($item, ['processing_attempts' => $attempts]);
 
                 return;
             }
@@ -59,7 +56,7 @@ class PendingMediaProcessor
             } else {
                 // Videos never get server-side auto-tagging/thumbnailing -
                 // the client already supplied a poster frame on complete().
-                $item->update(['status' => MediaItem::STATUS_PENDING_REVIEW]);
+                $this->markPendingReview($item);
             }
         } catch (\Throwable $e) {
             report($e);
@@ -76,6 +73,11 @@ class PendingMediaProcessor
         $result = $this->thumbnails->process($binary);
         $thumbKey = $this->store->thumbnailKeyFor($item->s3_key);
         $this->store->putObject($thumbKey, $result['thumbnail'], 'image/jpeg');
+
+        $item->refresh();
+        if ($item->status !== MediaItem::STATUS_PENDING_PROCESSING) {
+            return;
+        }
 
         $item->fill([
             'thumbnail_key' => $thumbKey,
@@ -95,7 +97,24 @@ class PendingMediaProcessor
             ]);
         }
 
-        $item->update(['status' => MediaItem::STATUS_PENDING_REVIEW]);
+        $this->markPendingReview($item);
+    }
+
+    /**
+     * An approver may have already accepted the upload while this slow
+     * work was running. Never move an approved or rejected row backwards.
+     *
+     * @param  array<string, mixed>  $extra
+     */
+    private function markPendingReview(MediaItem $item, array $extra = []): void
+    {
+        $item->refresh();
+
+        if ($item->status !== MediaItem::STATUS_PENDING_PROCESSING) {
+            return;
+        }
+
+        $item->update(['status' => MediaItem::STATUS_PENDING_REVIEW, ...$extra]);
     }
 
     private function recordFailure(MediaItem $item): void
@@ -107,7 +126,7 @@ class PendingMediaProcessor
         }
 
         if ($item->processing_attempts >= self::MAX_ATTEMPTS) {
-            $item->update(['status' => MediaItem::STATUS_PENDING_REVIEW]);
+            $this->markPendingReview($item);
         }
     }
 }

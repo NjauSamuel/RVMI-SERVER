@@ -28,9 +28,15 @@ class GalleryController extends Controller
             ->where('status', MediaItem::STATUS_APPROVED)
             ->when(! $canSeePrivate, function ($query) {
                 $query->where(function ($q) {
-                    $q->whereNull('visibility_override')
-                        ->whereHas('event', fn ($e) => $e->where('visibility', 'public'));
-                })->orWhere('visibility_override', 'public');
+                    $q->where('visibility_override', 'public')
+                        ->orWhere(function ($inherit) {
+                            $inherit->whereNull('visibility_override')
+                                ->where(function ($event) {
+                                    $event->whereDoesntHave('event')
+                                        ->orWhereHas('event', fn ($e) => $e->where('visibility', 'public'));
+                                });
+                        });
+                });
             })
             ->when($request->integer('event_id'), fn ($q, $eventId) => $q->where('event_id', $eventId))
             ->when($request->integer('tag_id'), function ($q, $tagId) {

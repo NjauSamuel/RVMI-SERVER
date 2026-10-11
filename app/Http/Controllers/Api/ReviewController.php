@@ -26,7 +26,10 @@ class ReviewController extends Controller
     public function pending(Request $request): JsonResponse
     {
         $items = MediaItem::query()
-            ->where('status', MediaItem::STATUS_PENDING_REVIEW)
+            ->whereIn('status', [
+                MediaItem::STATUS_PENDING_PROCESSING,
+                MediaItem::STATUS_PENDING_REVIEW,
+            ])
             ->with(['tags', 'event:id,title', 'uploader:id,name'])
             ->orderBy('created_at')
             ->paginate(60);
@@ -83,7 +86,7 @@ class ReviewController extends Controller
             'reviewed_by' => $request->user()->id,
             'reviewed_at' => now(),
         ]);
-        $this->store->deleteObject($mediaItem->s3_key);
+        $mediaItem->delete();
 
         return response()->json(['message' => 'Rejected.']);
     }
