@@ -7,12 +7,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Person extends Model
 {
-    protected $fillable = ['name', 'indexed_in_rekognition', 'tag_id'];
+    protected $fillable = ['name', 'indexed_in_rekognition', 'reference_face_count', 'tag_id'];
 
     protected function casts(): array
     {
         return [
             'indexed_in_rekognition' => 'boolean',
+            'reference_face_count' => 'integer',
         ];
     }
 

@@ -22,6 +22,12 @@ class GalleryController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $request->validate([
+            'from' => ['sometimes', 'nullable', 'date'],
+            'to' => ['sometimes', 'nullable', 'date'],
+            'type' => ['sometimes', 'nullable', 'in:image,video'],
+        ]);
+
         $canSeePrivate = $request->user()->can('view-private-media');
 
         $items = MediaItem::query()
@@ -42,6 +48,9 @@ class GalleryController extends Controller
             ->when($request->integer('tag_id'), function ($q, $tagId) {
                 $q->whereHas('tags', fn ($t) => $t->where('tags.id', $tagId));
             })
+            ->when($request->filled('from'), fn ($q) => $q->where('created_at', '>=', $request->date('from')))
+            ->when($request->filled('to'), fn ($q) => $q->where('created_at', '<=', $request->date('to')))
+            ->when($request->filled('type'), fn ($q) => $q->where('type', $request->string('type')->toString()))
             ->with('tags')
             ->orderByDesc('created_at')
             ->paginate(40);

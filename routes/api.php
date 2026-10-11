@@ -67,6 +67,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:manage-people')->group(function () {
         Route::get('/people', [PersonController::class, 'index']);
         Route::post('/people', [PersonController::class, 'store']);
+        Route::post('/people/train-from-gallery', [PersonController::class, 'trainFromGallery']);
+        Route::post('/people/tag-selected', [PersonController::class, 'tagSelected']);
         Route::post('/people/{person}/presign-reference-photo', [PersonController::class, 'presignReferencePhoto']);
         Route::post('/people/{person}/train', [PersonController::class, 'trainFromReferencePhoto']);
     });
