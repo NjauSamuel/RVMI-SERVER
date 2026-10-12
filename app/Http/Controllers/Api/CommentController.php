@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Event;
+use App\Services\Push\MemberPush;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -31,11 +32,23 @@ class CommentController extends Controller
         $comment = $event->comments()->create([
             'user_id' => $request->user()->id,
             'body' => $data['body'],
+            'notified' => true,
         ]);
 
-        // Deliberately NOT sent immediately - the notifications:dispatch-digest
-        // cron command batches these into one push per event, so the feed
-        // never feels like a per-comment social notification spam.
+        $actor = $request->user();
+        $title = $event->title;
+        $body = $actor->name.' commented on '.$event->title;
+        $actorId = $actor->id;
+        $eventId = $event->id;
+        $privateEvent = $event->isPrivate() ? $event : null;
+
+        app()->terminating(function () use ($title, $body, $actorId, $eventId, $privateEvent) {
+            app(MemberPush::class)->send($title, $body, [
+                'type' => 'event_comment',
+                'event_id' => (string) $eventId,
+            ], [$actorId], $privateEvent);
+        });
+
         return response()->json([
             'data' => [
                 'id' => $comment->id,

@@ -7,6 +7,7 @@ use App\Models\MediaItem;
 use App\Models\Tag;
 use App\Services\Media\CloudFrontUrlSigner;
 use App\Services\Media\S3MediaStore;
+use App\Services\Push\ApprovalPushHold;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,7 @@ class ReviewController extends Controller
     public function __construct(
         private readonly S3MediaStore $store,
         private readonly CloudFrontUrlSigner $signer,
+        private readonly ApprovalPushHold $approvalPush,
     ) {}
 
     /**
@@ -93,6 +95,7 @@ class ReviewController extends Controller
     public function approve(Request $request, MediaItem $mediaItem): JsonResponse
     {
         $this->approveOne($mediaItem, $request->user()->id);
+        $this->approvalPush->note(1, $request->user()->id);
 
         return response()->json(['data' => $this->toArray($mediaItem->fresh(['tags', 'event']))]);
     }
@@ -121,6 +124,8 @@ class ReviewController extends Controller
         foreach ($items as $item) {
             $this->approveOne($item, $request->user()->id);
         }
+
+        $this->approvalPush->note(count($items), $request->user()->id);
 
         return response()->json(['message' => count($items).' item(s) approved.']);
     }

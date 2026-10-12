@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Event;
 use App\Models\MediaItem;
 use App\Services\Media\PendingMediaProcessor;
 use App\Services\Media\S3MediaStore;
+use App\Services\Push\MemberPush;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -117,5 +119,31 @@ class UploadController extends Controller
         }
 
         return response()->json(['data' => ['id' => $mediaItem->id, 'status' => $mediaItem->status]]);
+    }
+
+    /**
+     * One push for a finished selection. A single photo and a batch of
+     * forty both land here once. Push failure still returns success.
+     */
+    public function announced(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'count' => ['required', 'integer', 'min:1', 'max:100'],
+            'event_id' => ['nullable', 'integer', 'exists:events,id'],
+        ]);
+
+        $count = (int) $data['count'];
+        $actorId = $request->user()->id;
+        $event = isset($data['event_id']) ? Event::query()->find($data['event_id']) : null;
+        $privateEvent = $event?->isPrivate() ? $event : null;
+        $body = $count === 1 ? '1 new upload' : $count.' new uploads';
+
+        app()->terminating(function () use ($body, $actorId, $privateEvent) {
+            app(MemberPush::class)->send('New uploads', $body, [
+                'type' => 'upload_batch',
+            ], [$actorId], $privateEvent);
+        });
+
+        return response()->json(['message' => 'Announced.']);
     }
 }

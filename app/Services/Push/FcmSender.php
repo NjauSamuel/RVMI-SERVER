@@ -8,12 +8,18 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Sends pushes via the FCM HTTP v1 API using a Firebase service account.
- * Deliberately simple/synchronous - calls happen inside a cron command tick,
- * never from a long-running worker.
+ * One access token is reused for every device in the same fan-out.
+ * A failed or unconfigured send returns false and never throws.
  */
 class FcmSender
 {
     private const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
+
+    private ?string $accessToken = null;
+
+    private bool $tokenResolved = false;
+
+    private bool $loggedSkip = false;
 
     public function configured(): bool
     {
@@ -26,14 +32,16 @@ class FcmSender
     public function send(string $deviceToken, string $title, string $body, array $data = []): bool
     {
         if (! $this->configured()) {
-            Log::info('FCM not configured; skipping push.', ['title' => $title]);
+            if (! $this->loggedSkip) {
+                Log::info('FCM not configured; skipping push.', ['title' => $title]);
+                $this->loggedSkip = true;
+            }
 
             return false;
         }
 
         try {
-            $credentials = new ServiceAccountCredentials(self::SCOPE, config('services.fcm.credentials_path'));
-            $token = $credentials->fetchAuthToken()['access_token'] ?? null;
+            $token = $this->accessToken();
 
             if (! $token) {
                 return false;
@@ -65,5 +73,24 @@ class FcmSender
 
             return false;
         }
+    }
+
+    private function accessToken(): ?string
+    {
+        if ($this->tokenResolved) {
+            return $this->accessToken;
+        }
+
+        $this->tokenResolved = true;
+
+        try {
+            $credentials = new ServiceAccountCredentials(self::SCOPE, config('services.fcm.credentials_path'));
+            $this->accessToken = $credentials->fetchAuthToken()['access_token'] ?? null;
+        } catch (\Throwable $e) {
+            report($e);
+            $this->accessToken = null;
+        }
+
+        return $this->accessToken;
     }
 }

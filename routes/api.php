@@ -62,6 +62,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Upload + staging - requires the upload permission.
     Route::middleware('permission:upload-media')->group(function () {
         Route::post('/uploads/presign', [UploadController::class, 'presign']);
+        Route::post('/uploads/announced', [UploadController::class, 'announced']);
         Route::post('/uploads/{mediaItem}/complete', [UploadController::class, 'complete']);
     });
 

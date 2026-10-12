@@ -10,6 +10,7 @@ Artisan::command('inspire', function () {
 
 // One cPanel cron, every five minutes (Namecheap's minimum):
 //   */5 * * * * php /path/to/server/artisan schedule:run >> /dev/null 2>&1
-// Digest first so a slow media retry cannot skip pushes.
-Schedule::command('notifications:dispatch-digest')->everyFiveMinutes()->withoutOverlapping();
+// Comments and uploads push immediately. This tick only retries media
+// processing and flushes approval pushes that waited out 30 minutes.
+Schedule::command('notifications:flush-approval-hold')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('media:process-pending')->everyFiveMinutes()->withoutOverlapping();
