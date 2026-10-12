@@ -135,6 +135,42 @@ class S3MediaStore
         ]);
     }
 
+    /**
+     * Objects under a prefix, newest first.
+     *
+     * @return array<int, array{key: string, modified: int}>
+     */
+    public function listObjects(string $prefix): array
+    {
+        $objects = [];
+        $params = [
+            'Bucket' => $this->bucket(),
+            'Prefix' => $prefix,
+        ];
+
+        do {
+            $result = $this->client()->listObjectsV2($params);
+
+            foreach ($result['Contents'] ?? [] as $object) {
+                $key = (string) ($object['Key'] ?? '');
+                if ($key === '' || str_ends_with($key, '/')) {
+                    continue;
+                }
+                $modified = $object['LastModified'] ?? null;
+                $objects[] = [
+                    'key' => $key,
+                    'modified' => $modified instanceof \DateTimeInterface ? $modified->getTimestamp() : 0,
+                ];
+            }
+
+            $params['ContinuationToken'] = $result['NextContinuationToken'] ?? null;
+        } while (! empty($result['IsTruncated']));
+
+        usort($objects, fn (array $a, array $b) => $b['modified'] <=> $a['modified']);
+
+        return $objects;
+    }
+
     public function finalMediaKey(?int $eventId, string $stagingKey): string
     {
         $extension = pathinfo($stagingKey, PATHINFO_EXTENSION);

@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\MediaItem;
 use App\Models\Person;
+use App\Models\PersonReferencePhoto;
 use App\Models\Tag;
+use App\Services\Media\CloudFrontUrlSigner;
 use App\Services\Media\RekognitionAutoTagger;
 use App\Services\Media\S3MediaStore;
 use Illuminate\Http\JsonResponse;
@@ -18,6 +20,7 @@ class PersonController extends Controller
     public function __construct(
         private readonly S3MediaStore $store,
         private readonly RekognitionAutoTagger $rekognition,
+        private readonly CloudFrontUrlSigner $signer,
     ) {}
 
     public function index(): JsonResponse
@@ -65,10 +68,12 @@ class PersonController extends Controller
         }
 
         $person = $this->createPerson($data['name']);
-        $count = $this->rekognition->indexPersonFaces(
+        $keys = $this->rekognition->indexPersonFaces(
             $person,
             $items->pluck('s3_key')->filter()->values()->all(),
         );
+        $count = count($keys);
+        $this->rememberReferences($person, $keys, $items->pluck('id', 's3_key')->all());
 
         $person->update([
             'indexed_in_rekognition' => $count > 0,
@@ -193,7 +198,9 @@ class PersonController extends Controller
             }
         }
 
-        $count = $this->rekognition->indexPersonFaces($person, $keys, replace: true);
+        $indexedKeys = $this->rekognition->indexPersonFaces($person, $keys, replace: true);
+        $count = count($indexedKeys);
+        $this->rememberReferences($person, $indexedKeys);
 
         $person->update([
             'indexed_in_rekognition' => $count > 0,
@@ -207,6 +214,92 @@ class PersonController extends Controller
             'indexed' => $count > 0,
             'reference_face_count' => $count,
         ]);
+    }
+
+    /**
+     * The photos that trained this person. Existing people keep working
+     * before the next retrain: uploaded shots live under people/{id}/, and
+     * gallery training is the photos tagged with this person by hand.
+     */
+    public function references(Person $person): JsonResponse
+    {
+        $rows = $person->referencePhotos()->with('mediaItem')->orderBy('id')->get();
+
+        if ($rows->isEmpty()) {
+            $rows = $this->backfillReferences($person);
+        }
+
+        return response()->json([
+            'data' => [
+                'id' => $person->id,
+                'name' => $person->name,
+                'reference_face_count' => $person->reference_face_count,
+                'photos' => $rows->map(fn (PersonReferencePhoto $row) => [
+                    'url' => $this->signer->signedUrl($row->mediaItem?->thumbnail_key ?: $row->s3_key),
+                    'full_url' => $this->signer->signedUrl($row->s3_key),
+                    'media_item_id' => $row->media_item_id,
+                ])->values(),
+            ],
+        ]);
+    }
+
+    /**
+     * @param  array<int, string>  $keys
+     * @param  array<string, int>  $mediaIdsByKey
+     */
+    private function rememberReferences(Person $person, array $keys, array $mediaIdsByKey = []): void
+    {
+        $person->referencePhotos()->delete();
+
+        foreach ($keys as $key) {
+            PersonReferencePhoto::query()->create([
+                'person_id' => $person->id,
+                's3_key' => $key,
+                'media_item_id' => $mediaIdsByKey[$key] ?? null,
+            ]);
+        }
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, PersonReferencePhoto>
+     */
+    private function backfillReferences(Person $person)
+    {
+        $uploaded = [];
+        try {
+            $uploaded = $this->store->listObjects("people/{$person->id}/");
+        } catch (\Throwable $e) {
+            report($e);
+        }
+        $limit = $person->reference_face_count > 0 ? $person->reference_face_count : count($uploaded);
+        $keys = array_slice(array_column($uploaded, 'key'), 0, $limit);
+
+        if ($keys === [] && $person->tag_id) {
+            $items = MediaItem::query()
+                ->where('type', 'image')
+                ->whereNotNull('s3_key')
+                ->whereHas('tags', function ($query) use ($person) {
+                    $query->where('tags.id', $person->tag_id)
+                        ->where('media_tag.source', 'manual');
+                })
+                ->orderByDesc('id')
+                ->limit(5)
+                ->get();
+
+            $this->rememberReferences(
+                $person,
+                $items->pluck('s3_key')->all(),
+                $items->pluck('id', 's3_key')->all(),
+            );
+
+            return $person->referencePhotos()->with('mediaItem')->orderBy('id')->get();
+        }
+
+        if ($keys !== []) {
+            $this->rememberReferences($person, $keys);
+        }
+
+        return $person->referencePhotos()->with('mediaItem')->orderBy('id')->get();
     }
 
     private function personNameTaken(string $name): bool

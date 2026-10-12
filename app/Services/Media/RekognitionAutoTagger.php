@@ -98,8 +98,9 @@ class RekognitionAutoTagger
      * previously indexed faces for the same ExternalImageId are removed first.
      *
      * @param  array<int, string>  $s3Keys
+     * @return array<int, string> Keys whose face was indexed
      */
-    public function indexPersonFaces(Person $person, array $s3Keys, bool $replace = false): int
+    public function indexPersonFaces(Person $person, array $s3Keys, bool $replace = false): array
     {
         $this->ensureCollectionExists();
 
@@ -107,11 +108,11 @@ class RekognitionAutoTagger
             $this->deletePersonFaces($person);
         }
 
-        $indexed = 0;
+        $indexed = [];
 
         foreach ($s3Keys as $s3Key) {
             if ($this->indexPersonFace($person, $s3Key)) {
-                $indexed++;
+                $indexed[] = $s3Key;
             }
         }
 

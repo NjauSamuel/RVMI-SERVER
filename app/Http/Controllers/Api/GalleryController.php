@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Event;
 use App\Models\MediaItem;
 use App\Models\Tag;
 use App\Models\UserMediaFavorite;
@@ -47,19 +48,76 @@ class GalleryController extends Controller
 
     public function saved(Request $request): JsonResponse
     {
-        $userId = $request->user()->id;
+        $request->validate([
+            'from' => ['sometimes', 'nullable', 'date'],
+            'to' => ['sometimes', 'nullable', 'date'],
+            'saved_from' => ['sometimes', 'nullable', 'date'],
+            'saved_to' => ['sometimes', 'nullable', 'date'],
+            'type' => ['sometimes', 'nullable', 'in:image,video'],
+        ]);
 
-        $items = $this->visibleItems($request)
-            ->join('user_media_favorites', function ($join) use ($userId) {
-                $join->on('user_media_favorites.media_item_id', '=', 'media_items.id')
-                    ->where('user_media_favorites.user_id', $userId);
+        $items = $this->favoriteItems($request)
+            ->when($request->integer('event_id'), fn ($q, $eventId) => $q->where('media_items.event_id', $eventId))
+            ->when($request->integer('tag_id'), function ($q, $tagId) {
+                $q->whereHas('tags', fn ($t) => $t->where('tags.id', $tagId));
             })
-            ->select('media_items.*')
+            ->when($request->filled('from'), fn ($q) => $q->where('media_items.created_at', '>=', $request->date('from')))
+            ->when($request->filled('to'), fn ($q) => $q->where('media_items.created_at', '<=', $request->date('to')))
+            ->when($request->filled('saved_from'), fn ($q) => $q->where('user_media_favorites.created_at', '>=', $request->date('saved_from')))
+            ->when($request->filled('saved_to'), fn ($q) => $q->where('user_media_favorites.created_at', '<=', $request->date('saved_to')))
+            ->when($request->filled('type'), fn ($q) => $q->where('media_items.type', $request->string('type')->toString()))
             ->with('tags')
             ->orderByDesc('user_media_favorites.created_at')
             ->paginate(40);
 
         return response()->json($this->presentPage($request, $items));
+    }
+
+    /**
+     * Tags, events, months, and media kinds that actually appear in this
+     * user's saved photos. The filter sheet offers only these.
+     */
+    public function savedFilters(Request $request): JsonResponse
+    {
+        $items = $this->favoriteItems($request)->get();
+        $ids = $items->pluck('id');
+
+        $tags = $ids->isEmpty()
+            ? collect()
+            : Tag::query()
+                ->whereHas('media', fn ($q) => $q->whereIn('media_items.id', $ids))
+                ->orderByRaw("case when kind = 'person' then 0 else 1 end")
+                ->orderBy('name')
+                ->get(['id', 'name', 'kind']);
+
+        $events = Event::query()
+            ->whereIn('id', $items->pluck('event_id')->filter()->unique()->values())
+            ->orderBy('title')
+            ->get(['id', 'title']);
+
+        $savedAt = $ids->isEmpty()
+            ? collect()
+            : UserMediaFavorite::query()
+                ->where('user_id', $request->user()->id)
+                ->whereIn('media_item_id', $ids)
+                ->pluck('created_at');
+
+        return response()->json([
+            'data' => [
+                'tags' => $tags->map(fn (Tag $tag) => [
+                    'id' => $tag->id,
+                    'name' => $tag->name,
+                    'kind' => $tag->kind,
+                ])->values(),
+                'events' => $events->map(fn (Event $event) => [
+                    'id' => $event->id,
+                    'title' => $event->title,
+                ])->values(),
+                'types' => $items->pluck('type')->unique()->sort()->values(),
+                'saved_months' => $this->months($savedAt),
+                'content_months' => $this->months($items->pluck('created_at')),
+            ],
+        ]);
     }
 
     public function show(Request $request, MediaItem $mediaItem): JsonResponse
@@ -123,6 +181,45 @@ class GalleryController extends Controller
         );
 
         return response()->json(['message' => 'Deleted.']);
+    }
+
+    /**
+     * @return Builder<MediaItem>
+     */
+    private function favoriteItems(Request $request): Builder
+    {
+        $userId = $request->user()->id;
+
+        return $this->visibleItems($request)
+            ->join('user_media_favorites', function ($join) use ($userId) {
+                $join->on('user_media_favorites.media_item_id', '=', 'media_items.id')
+                    ->where('user_media_favorites.user_id', $userId);
+            })
+            ->select('media_items.*');
+    }
+
+    /**
+     * @param  iterable<mixed>  $dates
+     * @return array<int, string>
+     */
+    private function months(iterable $dates): array
+    {
+        return collect($dates)
+            ->filter()
+            ->map(function ($date) {
+                if ($date instanceof \DateTimeInterface) {
+                    return $date->format('Y-m');
+                }
+
+                $value = substr((string) $date, 0, 7);
+
+                return preg_match('/^\d{4}-\d{2}$/', $value) === 1 ? $value : null;
+            })
+            ->filter()
+            ->unique()
+            ->sortDesc()
+            ->values()
+            ->all();
     }
 
     /**

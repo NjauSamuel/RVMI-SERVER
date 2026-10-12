@@ -31,12 +31,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/gallery/{mediaItem}/favorite', [GalleryController::class, 'favorite']);
     Route::delete('/gallery/{mediaItem}/favorite', [GalleryController::class, 'unfavorite']);
     Route::get('/me/saved-photos', [GalleryController::class, 'saved']);
+    Route::get('/me/saved-photos/filters', [GalleryController::class, 'savedFilters']);
+    Route::get('/me/saved-events', [EventController::class, 'saved']);
+    Route::get('/me/saved-events/filters', [EventController::class, 'savedFilters']);
     Route::delete('/gallery/{mediaItem}', [GalleryController::class, 'destroy'])->middleware('permission:delete-records');
 
     // Events + the umbrella comment thread.
     Route::get('/events', [EventController::class, 'index']);
     Route::get('/events/deleted', [EventController::class, 'deleted'])->middleware('permission:manage-events');
     Route::get('/events/{event}', [EventController::class, 'show']);
+    Route::post('/events/{event}/favorite', [EventController::class, 'favorite']);
+    Route::delete('/events/{event}/favorite', [EventController::class, 'unfavorite']);
     Route::get('/events/{event}/comments', [CommentController::class, 'index']);
     Route::post('/events/{event}/comments', [CommentController::class, 'store'])->middleware('permission:comment');
 
@@ -75,6 +80,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/people', [PersonController::class, 'store']);
         Route::post('/people/train-from-gallery', [PersonController::class, 'trainFromGallery']);
         Route::post('/people/tag-selected', [PersonController::class, 'tagSelected']);
+        Route::get('/people/{person}/references', [PersonController::class, 'references']);
         Route::post('/people/{person}/presign-reference-photo', [PersonController::class, 'presignReferencePhoto']);
         Route::post('/people/{person}/train', [PersonController::class, 'trainFromReferencePhoto']);
     });
