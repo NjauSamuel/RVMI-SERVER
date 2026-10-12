@@ -56,11 +56,12 @@ class UploadController extends Controller
     }
 
     /**
-     * Step 2: client confirms the PUT succeeded for a given item. Videos with
-     * a poster frame go straight to pending_review. Images are marked
-     * pending_processing and processed after this response is sent (thumbnail,
-     * BlurHash, Rekognition) so the phone does not wait on AWS. The 5-minute
-     * cron only retries rows whose processing did not finish.
+     * Step 2: client confirms the PUT succeeded for a given item. A poster,
+     * when the phone sends one, is stored as the thumbnail immediately.
+     * Videos with that poster go straight to pending_review. Images stay
+     * pending_processing so Rekognition can run after this response, without
+     * the phone waiting on AWS. The 5-minute cron only retries rows whose
+     * processing did not finish.
      */
     public function complete(Request $request, MediaItem $mediaItem): JsonResponse
     {
@@ -71,12 +72,12 @@ class UploadController extends Controller
             'width' => ['nullable', 'integer'],
             'height' => ['nullable', 'integer'],
             'duration_seconds' => ['nullable', 'integer'],
-            // Base64 JPEG poster frame for videos (image uploads don't need this -
-            // the server generates their thumbnail/BlurHash itself).
+            // Small JPEG preview. Photos and videos both send one so the
+            // grids do not download the full file.
             'poster_frame_base64' => ['nullable', 'string'],
         ]);
 
-        if ($mediaItem->type === 'video' && ! empty($data['poster_frame_base64'])) {
+        if (! empty($data['poster_frame_base64'])) {
             $thumbKey = $this->store->thumbnailKeyFor($mediaItem->s3_key);
             $this->store->putObject(
                 $thumbKey,

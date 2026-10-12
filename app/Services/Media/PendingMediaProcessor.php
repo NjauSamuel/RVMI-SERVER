@@ -68,6 +68,12 @@ class PendingMediaProcessor
 
     private function processImage(MediaItem $item): void
     {
+        if ($item->thumbnail_key) {
+            $this->tagAndFinish($item);
+
+            return;
+        }
+
         $binary = $this->store->getObjectBody($item->s3_key);
 
         $result = $this->thumbnails->process($binary);
@@ -85,6 +91,19 @@ class PendingMediaProcessor
             'width' => $result['width'],
             'height' => $result['height'],
         ])->save();
+
+        $this->tagAndFinish($item);
+    }
+
+    /**
+     * Rekognition reads the stored object directly. This does not download it.
+     */
+    private function tagAndFinish(MediaItem $item): void
+    {
+        $item->refresh();
+        if ($item->status !== MediaItem::STATUS_PENDING_PROCESSING) {
+            return;
+        }
 
         $autoTags = $this->rekognition->autoTag($item);
 
