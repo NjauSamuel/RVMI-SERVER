@@ -64,10 +64,10 @@ class S3MediaStore
     }
 
     /**
-     * A short-lived URL the phone can GET. Used when CloudFront is not
+     * A view URL the phone can GET. Used when CloudFront is not
      * configured, so the bucket can stay private.
      */
-    public function presignedGetUrl(string $key, int $expiresInSeconds = 600): string
+    public function presignedGetUrl(string $key, int $expiresInSeconds = 21600): string
     {
         $command = $this->client()->getCommand('GetObject', [
             'Bucket' => $this->bucket(),

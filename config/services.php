@@ -53,7 +53,7 @@ return [
             'domain' => env('CLOUDFRONT_DOMAIN'),
             'key_pair_id' => env('CLOUDFRONT_KEY_PAIR_ID'),
             'private_key_path' => env('CLOUDFRONT_PRIVATE_KEY_PATH'),
-            'signed_url_ttl_seconds' => env('CLOUDFRONT_SIGNED_URL_TTL', 600),
+            'signed_url_ttl_seconds' => env('CLOUDFRONT_SIGNED_URL_TTL', 21600),
         ],
 
         'rekognition' => [

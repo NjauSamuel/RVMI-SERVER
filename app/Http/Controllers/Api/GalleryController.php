@@ -36,11 +36,12 @@ class GalleryController extends Controller
             ->when($request->integer('tag_id'), function ($q, $tagId) {
                 $q->whereHas('tags', fn ($t) => $t->where('tags.id', $tagId));
             })
-            ->when($request->filled('from'), fn ($q) => $q->where('created_at', '>=', $request->date('from')))
-            ->when($request->filled('to'), fn ($q) => $q->where('created_at', '<=', $request->date('to')))
+            ->when($request->filled('from'), fn ($q) => $q->whereRaw($this->displayAtSql().' >= ?', [$request->date('from')]))
+            ->when($request->filled('to'), fn ($q) => $q->whereRaw($this->displayAtSql().' <= ?', [$request->date('to')]))
             ->when($request->filled('type'), fn ($q) => $q->where('type', $request->string('type')->toString()))
             ->with('tags')
-            ->orderByDesc('created_at')
+            ->orderByRaw($this->displayAtSql().' desc')
+            ->orderByDesc('media_items.id')
             ->paginate(40);
 
         return response()->json($this->presentPage($request, $items));
@@ -61,8 +62,8 @@ class GalleryController extends Controller
             ->when($request->integer('tag_id'), function ($q, $tagId) {
                 $q->whereHas('tags', fn ($t) => $t->where('tags.id', $tagId));
             })
-            ->when($request->filled('from'), fn ($q) => $q->where('media_items.created_at', '>=', $request->date('from')))
-            ->when($request->filled('to'), fn ($q) => $q->where('media_items.created_at', '<=', $request->date('to')))
+            ->when($request->filled('from'), fn ($q) => $q->whereRaw($this->displayAtSql().' >= ?', [$request->date('from')]))
+            ->when($request->filled('to'), fn ($q) => $q->whereRaw($this->displayAtSql().' <= ?', [$request->date('to')]))
             ->when($request->filled('saved_from'), fn ($q) => $q->where('user_media_favorites.created_at', '>=', $request->date('saved_from')))
             ->when($request->filled('saved_to'), fn ($q) => $q->where('user_media_favorites.created_at', '<=', $request->date('saved_to')))
             ->when($request->filled('type'), fn ($q) => $q->where('media_items.type', $request->string('type')->toString()))
@@ -115,7 +116,7 @@ class GalleryController extends Controller
                 ])->values(),
                 'types' => $items->pluck('type')->unique()->sort()->values(),
                 'saved_months' => $this->months($savedAt),
-                'content_months' => $this->months($items->pluck('created_at')),
+                'content_months' => $this->months($items->map(fn (MediaItem $item) => $item->displayAt())),
             ],
         ]);
     }
@@ -196,6 +197,14 @@ class GalleryController extends Controller
                     ->where('user_media_favorites.user_id', $userId);
             })
             ->select('media_items.*');
+    }
+
+    /**
+     * Photo month: a chosen day when one was set, otherwise the upload time.
+     */
+    private function displayAtSql(): string
+    {
+        return 'COALESCE(media_items.taken_at, media_items.created_at)';
     }
 
     /**
@@ -297,6 +306,7 @@ class GalleryController extends Controller
             'is_favorite' => $isFavorite,
             'tags' => $item->tags->map(fn (Tag $tag) => ['id' => $tag->id, 'name' => $tag->name, 'kind' => $tag->kind]),
             'created_at' => $item->created_at,
+            'taken_at' => $item->taken_at,
         ];
     }
 }

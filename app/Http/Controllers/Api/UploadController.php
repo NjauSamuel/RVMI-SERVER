@@ -25,12 +25,18 @@ class UploadController extends Controller
     {
         $data = $request->validate([
             'event_id' => ['nullable', 'integer', 'exists:events,id'],
+            // One calendar day for the whole batch. Omitted means upload time.
+            'taken_at' => ['nullable', 'date'],
             'files' => ['required', 'array', 'min:1', 'max:100'],
             'files.*.filename' => ['required', 'string'],
             'files.*.content_type' => ['required', 'string'],
             'files.*.type' => ['required', 'in:image,video'],
             'files.*.size_bytes' => ['nullable', 'integer'],
         ]);
+
+        $takenAt = isset($data['taken_at'])
+            ? MediaItem::takenAtFromInput((string) $data['taken_at'])
+            : null;
 
         $results = [];
 
@@ -44,6 +50,7 @@ class UploadController extends Controller
                 'status' => MediaItem::STATUS_STAGING,
                 'size_bytes' => $file['size_bytes'] ?? null,
                 'uploaded_by' => $request->user()->id,
+                'taken_at' => $takenAt,
             ]);
 
             $results[] = [

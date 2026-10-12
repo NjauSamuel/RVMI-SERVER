@@ -49,6 +49,8 @@ class ReviewController extends Controller
             'remove_tag_ids' => ['array'],
             'remove_tag_ids.*' => ['integer'],
             'poster_frame_base64' => ['nullable', 'string'],
+            // Present and null restores the upload date.
+            'taken_at' => ['sometimes', 'nullable', 'date'],
         ]);
 
         if (! empty($data['poster_frame_base64'])) {
@@ -66,6 +68,11 @@ class ReviewController extends Controller
         }
         if (array_key_exists('visibility_override', $data)) {
             $mediaItem->visibility_override = $data['visibility_override'];
+        }
+        if (array_key_exists('taken_at', $data)) {
+            $mediaItem->taken_at = $data['taken_at'] === null
+                ? null
+                : MediaItem::takenAtFromInput((string) $data['taken_at']);
         }
         $mediaItem->save();
 
@@ -166,6 +173,7 @@ class ReviewController extends Controller
                 'confidence' => $tag->pivot->confidence,
             ]),
             'created_at' => $item->created_at,
+            'taken_at' => $item->taken_at,
         ];
     }
 }

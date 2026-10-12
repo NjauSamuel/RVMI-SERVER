@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 class MediaItem extends Model
 {
@@ -38,14 +39,38 @@ class MediaItem extends Model
         'uploaded_by',
         'reviewed_by',
         'reviewed_at',
+        'taken_at',
     ];
 
     protected function casts(): array
     {
         return [
             'reviewed_at' => 'datetime',
+            'taken_at' => 'datetime',
             'processing_attempts' => 'integer',
         ];
+    }
+
+    /**
+     * A chosen calendar day, stored at noon UTC so the day does not slip
+     * when the phone converts it to local time.
+     */
+    public static function takenAtFromInput(string $value): Carbon
+    {
+        $day = substr($value, 0, 10);
+
+        $parsed = Carbon::createFromFormat('!Y-m-d', $day, 'UTC');
+
+        if ($parsed === false) {
+            throw new \InvalidArgumentException('Invalid photo date.');
+        }
+
+        return $parsed->setTime(12, 0);
+    }
+
+    public function displayAt(): Carbon
+    {
+        return $this->taken_at ?? $this->created_at ?? now();
     }
 
     public function event(): BelongsTo

@@ -5,7 +5,7 @@ namespace App\Services\Media;
 use Aws\CloudFront\CloudFrontClient;
 
 /**
- * Issues a short-lived view URL so private media stays access-controlled.
+ * Issues an expiring view URL so private media stays access-controlled.
  * CloudFront signed URLs when that distribution is configured; otherwise an
  * S3 presigned GET, which needs no extra service and works on shared hosting.
  */
@@ -23,7 +23,7 @@ class CloudFrontUrlSigner
     public function signedUrl(string $key): string
     {
         if (! $this->configured()) {
-            $ttl = (int) config('services.aws.cloudfront.signed_url_ttl_seconds', 600);
+            $ttl = (int) config('services.aws.cloudfront.signed_url_ttl_seconds', 21600);
 
             return $this->store->presignedGetUrl($key, $ttl);
         }
@@ -36,7 +36,7 @@ class CloudFrontUrlSigner
             'version' => 'latest',
         ]);
 
-        $expires = time() + (int) config('services.aws.cloudfront.signed_url_ttl_seconds', 600);
+        $expires = time() + (int) config('services.aws.cloudfront.signed_url_ttl_seconds', 21600);
 
         return $client->getSignedUrl([
             'url' => $url,
