@@ -79,8 +79,8 @@ class PendingMediaProcessor
     }
 
     /**
-     * Writes the small JPEG for a photo that is still in processing or review.
-     * An approved or rejected row is left unchanged.
+     * Writes the small JPEG for a photo that is still processing, in review,
+     * or already approved. Status is not changed. Rejected rows are skipped.
      */
     public function backfillThumbnail(MediaItem $item): void
     {
@@ -112,6 +112,7 @@ class PendingMediaProcessor
             && in_array($item->status, [
                 MediaItem::STATUS_PENDING_PROCESSING,
                 MediaItem::STATUS_PENDING_REVIEW,
+                MediaItem::STATUS_APPROVED,
             ], true);
     }
 
@@ -127,12 +128,19 @@ class PendingMediaProcessor
             return;
         }
 
-        $item->fill([
+        $attributes = [
             'thumbnail_key' => $thumbKey,
-            'blurhash' => $result['blurhash'] !== '' ? $result['blurhash'] : null,
-            'width' => $result['width'],
-            'height' => $result['height'],
-        ])->save();
+        ];
+        if ($result['blurhash'] !== '') {
+            $attributes['blurhash'] = $result['blurhash'];
+        }
+        if ($item->width === null) {
+            $attributes['width'] = $result['width'];
+        }
+        if ($item->height === null) {
+            $attributes['height'] = $result['height'];
+        }
+        $item->fill($attributes)->save();
     }
 
     /**
