@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Event;
 use App\Services\Media\CloudFrontUrlSigner;
 use Illuminate\Http\JsonResponse;
@@ -63,6 +64,48 @@ class EventController extends Controller
         ]);
 
         $event->update($data);
+
+        return response()->json(['data' => $this->toArray($event)]);
+    }
+
+    public function destroy(Request $request, Event $event): JsonResponse
+    {
+        $title = $event->title;
+        $event->delete();
+
+        AuditLog::record(
+            $request->user(),
+            'event.deleted',
+            $event,
+            "Deleted event {$title}.",
+        );
+
+        return response()->json(['message' => 'Deleted.']);
+    }
+
+    public function deleted(Request $request): JsonResponse
+    {
+        $events = Event::onlyTrashed()
+            ->withCount(['approvedMedia as media_count'])
+            ->with('coverMedia')
+            ->orderByDesc('deleted_at')
+            ->get()
+            ->map(fn (Event $event) => $this->toArray($event));
+
+        return response()->json(['data' => $events]);
+    }
+
+    public function restore(Request $request, int $id): JsonResponse
+    {
+        $event = Event::onlyTrashed()->findOrFail($id);
+        $event->restore();
+
+        AuditLog::record(
+            $request->user(),
+            'event.restored',
+            $event,
+            "Restored event {$event->title}.",
+        );
 
         return response()->json(['data' => $this->toArray($event)]);
     }

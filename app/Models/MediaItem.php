@@ -70,9 +70,20 @@ class MediaItem extends Model
             ->withTimestamps();
     }
 
+    public function favoritedBy(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(UserMediaFavorite::class);
+    }
+
     public function effectiveVisibility(): string
     {
-        return $this->visibility_override ?? $this->event?->visibility ?? 'public';
+        if ($this->visibility_override) {
+            return $this->visibility_override;
+        }
+
+        // Include a soft-deleted event so its photos keep that visibility
+        // until the event is restored.
+        return $this->event()->withTrashed()->value('visibility') ?? 'public';
     }
 
     public function isImage(): bool

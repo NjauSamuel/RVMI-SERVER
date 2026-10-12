@@ -60,8 +60,6 @@ return [
             'enabled' => env('REKOGNITION_ENABLED', true),
             'face_collection_id' => env('REKOGNITION_FACE_COLLECTION_ID', 'rvmi-media-people'),
             'min_face_confidence' => env('REKOGNITION_MIN_FACE_CONFIDENCE', 80),
-            'min_label_confidence' => env('REKOGNITION_MIN_LABEL_CONFIDENCE', 75),
-            'max_labels' => env('REKOGNITION_MAX_LABELS', 8),
         ],
     ],
 

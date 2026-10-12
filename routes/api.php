@@ -28,10 +28,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/gallery', [GalleryController::class, 'index']);
     Route::get('/gallery/{mediaItem}', [GalleryController::class, 'show']);
     Route::post('/gallery/{mediaItem}/view', [GalleryController::class, 'recordView']);
+    Route::post('/gallery/{mediaItem}/favorite', [GalleryController::class, 'favorite']);
+    Route::delete('/gallery/{mediaItem}/favorite', [GalleryController::class, 'unfavorite']);
+    Route::get('/me/saved-photos', [GalleryController::class, 'saved']);
     Route::delete('/gallery/{mediaItem}', [GalleryController::class, 'destroy'])->middleware('permission:delete-records');
 
     // Events + the umbrella comment thread.
     Route::get('/events', [EventController::class, 'index']);
+    Route::get('/events/deleted', [EventController::class, 'deleted'])->middleware('permission:manage-events');
     Route::get('/events/{event}', [EventController::class, 'show']);
     Route::get('/events/{event}/comments', [CommentController::class, 'index']);
     Route::post('/events/{event}/comments', [CommentController::class, 'store'])->middleware('permission:comment');
@@ -39,6 +43,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:manage-events')->group(function () {
         Route::post('/events', [EventController::class, 'store']);
         Route::patch('/events/{event}', [EventController::class, 'update']);
+        Route::delete('/events/{event}', [EventController::class, 'destroy']);
+        Route::post('/events/{id}/restore', [EventController::class, 'restore'])->whereNumber('id');
     });
 
     // Tags: browse, favorite, and the personalised suggestion rail.

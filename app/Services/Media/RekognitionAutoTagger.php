@@ -13,9 +13,9 @@ use Intervention\Image\Interfaces\ImageInterface;
 
 /**
  * Calls AWS Rekognition directly against the S3 object (no download needed)
- * so the shared-hosting cron tick stays cheap. Produces:
- *  - scene/object labels (DetectLabels) -> 'moment'/'category' tags
- *  - known-person matches (SearchFacesByImage against our Face Collection) -> 'person' tags
+ * so the shared-hosting cron tick stays cheap. Matches known people
+ * (SearchFacesByImage against our Face Collection) and attaches their
+ * person tags. Scene labels are not requested.
  *
  * Scoped to images only - video auto-tagging is intentionally out of scope.
  */
@@ -53,61 +53,7 @@ class RekognitionAutoTagger
             return [];
         }
 
-        $results = [];
-
-        foreach ($this->detectLabelTags($mediaItem) as $result) {
-            $results[] = $result;
-        }
-
-        foreach ($this->detectFaceTags($mediaItem) as $result) {
-            $results[] = $result;
-        }
-
-        return $results;
-    }
-
-    /**
-     * @return array<int, array{tag: Tag, source: string, confidence: int}>
-     */
-    private function detectLabelTags(MediaItem $mediaItem): array
-    {
-        try {
-            $response = $this->client()->detectLabels([
-                'Image' => [
-                    'S3Object' => [
-                        'Bucket' => $this->store->bucket(),
-                        'Name' => $mediaItem->s3_key,
-                    ],
-                ],
-                'MaxLabels' => (int) config('services.aws.rekognition.max_labels', 8),
-                'MinConfidence' => (float) config('services.aws.rekognition.min_label_confidence', 75),
-            ]);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return [];
-        }
-
-        $results = [];
-
-        foreach ($response['Labels'] ?? [] as $label) {
-            $name = (string) ($label['Name'] ?? '');
-            if ($name === '') {
-                continue;
-            }
-
-            $tag = Tag::query()->firstOrCreate(
-                ['name' => $name, 'kind' => 'moment'],
-            );
-
-            $results[] = [
-                'tag' => $tag,
-                'source' => 'auto',
-                'confidence' => (int) round((float) ($label['Confidence'] ?? 0)),
-            ];
-        }
-
-        return $results;
+        return $this->detectFaceTags($mediaItem);
     }
 
     /**
