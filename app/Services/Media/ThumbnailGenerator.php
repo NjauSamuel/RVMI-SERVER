@@ -42,7 +42,11 @@ class ThumbnailGenerator
             ->scaleDown(width: self::THUMB_MAX_DIMENSION, height: self::THUMB_MAX_DIMENSION);
         $thumbnailBinary = (string) $thumb->encode(new JpegEncoder(quality: 72));
 
-        $blurhash = $this->encodeBlurhash($image);
+        try {
+            $blurhash = $this->encodeBlurhash($image);
+        } catch (\Throwable) {
+            $blurhash = '';
+        }
 
         return [
             'thumbnail' => $thumbnailBinary,

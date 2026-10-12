@@ -74,25 +74,65 @@ class PendingMediaProcessor
             return;
         }
 
-        $binary = $this->store->getObjectBody($item->s3_key);
+        $this->storeThumbnail($item);
+        $this->tagAndFinish($item);
+    }
 
+    /**
+     * Writes the small JPEG for a photo that is still in processing or review.
+     * An approved or rejected row is left unchanged.
+     */
+    public function backfillThumbnail(MediaItem $item): void
+    {
+        $lock = Cache::lock('media-process-'.$item->id, self::LOCK_SECONDS);
+
+        if (! $lock->get()) {
+            return;
+        }
+
+        try {
+            $item->refresh();
+
+            if (! $this->canStoreThumbnail($item)) {
+                return;
+            }
+
+            $this->storeThumbnail($item);
+        } catch (\Throwable $e) {
+            report($e);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function canStoreThumbnail(MediaItem $item): bool
+    {
+        return $item->isImage()
+            && $item->thumbnail_key === null
+            && in_array($item->status, [
+                MediaItem::STATUS_PENDING_PROCESSING,
+                MediaItem::STATUS_PENDING_REVIEW,
+            ], true);
+    }
+
+    private function storeThumbnail(MediaItem $item): void
+    {
+        $binary = $this->store->getObjectBody($item->s3_key);
         $result = $this->thumbnails->process($binary);
         $thumbKey = $this->store->thumbnailKeyFor($item->s3_key);
         $this->store->putObject($thumbKey, $result['thumbnail'], 'image/jpeg');
 
         $item->refresh();
-        if ($item->status !== MediaItem::STATUS_PENDING_PROCESSING) {
+        if (! $this->canStoreThumbnail($item)) {
             return;
         }
 
         $item->fill([
             'thumbnail_key' => $thumbKey,
-            'blurhash' => $result['blurhash'],
+            'blurhash' => $result['blurhash'] !== '' ? $result['blurhash'] : null,
             'width' => $result['width'],
             'height' => $result['height'],
         ])->save();
-
-        $this->tagAndFinish($item);
     }
 
     /**
