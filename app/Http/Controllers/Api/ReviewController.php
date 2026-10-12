@@ -48,7 +48,18 @@ class ReviewController extends Controller
             'add_tag_names.*' => ['string', 'max:100'],
             'remove_tag_ids' => ['array'],
             'remove_tag_ids.*' => ['integer'],
+            'poster_frame_base64' => ['nullable', 'string'],
         ]);
+
+        if (! empty($data['poster_frame_base64'])) {
+            $poster = base64_decode($data['poster_frame_base64'], true);
+            if ($poster === false || $poster === '') {
+                return response()->json(['message' => 'That frame could not be saved.'], 422);
+            }
+            $thumbKey = $mediaItem->thumbnail_key ?: $this->store->thumbnailKeyFor($mediaItem->s3_key);
+            $this->store->putObject($thumbKey, $poster, 'image/jpeg');
+            $mediaItem->thumbnail_key = $thumbKey;
+        }
 
         if (array_key_exists('event_id', $data)) {
             $mediaItem->event_id = $data['event_id'];
